@@ -23,3 +23,55 @@ function removeVideoStream(elementId) {
         let remoteDiv = document.getElementById(elementId);
         if (remoteDiv) remoteDiv.parentNode.removeChild(remoteDiv);
 };
+
+let client = AgoraRTC.createClient({
+    mode: "rtc",
+    codec: "vp8",
+});
+client.init("36e68a5692134f378a4eb9617de5f9e3", function() {
+    console.log("client initialized");
+}, function(err) {
+    console.log("client init failed ", err);
+});
+
+// Join a channel
+client.join(null, "myChannel", null, (uid)=>{
+  // Create a local stream
+let localStream = AgoraRTC.createStream({
+    audio: true,
+    video: true,
+});
+// Initialize the local stream
+localStream.init(()=>{
+    // Play the local stream
+    localStream.play("me");
+    // Publish the local stream
+    client.publish(localStream, handleError);
+}, handleError);
+        
+        // Subscribe to the remote stream when it is published
+client.on("stream-added", function(evt){
+    client.subscribe(evt.stream, handleError);
+});
+// Play the remote stream when it is subsribed
+client.on("stream-subscribed", function(evt){
+    let stream = evt.stream;
+    let streamId = String(stream.getId());
+    addVideoStream(streamId);
+    stream.play(streamId);
+});
+// Remove the corresponding view when a remote user unpublishes.
+client.on("stream-removed", function(evt){
+    let stream = evt.stream;
+    let streamId = String(stream.getId());
+    stream.close();
+    removeVideoStream(streamId);
+});
+// Remove the corresponding view when a remote user leaves the channel.
+client.on("peer-leave", function(evt){
+    let stream = evt.stream;
+    let streamId = String(stream.getId());
+    stream.close();
+    removeVideoStream(streamId);
+});
+}, handleError);
